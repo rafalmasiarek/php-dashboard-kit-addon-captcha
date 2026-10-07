@@ -1,0 +1,19 @@
+{
+    "name": "rafalmasiarek/dashboard-kit-addon-captcha",
+    "description": "CAPTCHA addon for rafalmasiarek/dashboard-kit — injects CAPTCHA (reCAPTCHA, Cloudflare Turnstile, hCaptcha, via rafalmasiarek/captcha) into login and register forms, with DB-backed failed-attempt throttling.",
+    "type": "library",
+    "license": "BUSL-1.1",
+    "require": {
+        "php": ">=8.2",
+        "rafalmasiarek/dashboard-kit": "^5.4",
+        "rafalmasiarek/captcha": "^1.0",
+        "rafalmasiarek/real-ip-resolver": "^2.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "rafalmasiarek\\DashboardKitCaptcha\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
