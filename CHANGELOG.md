@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/compare/v1.0.0...v1.0.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* allow a custom CaptchaProviderInterface, not just the 4 built-ins ([5c97d77](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/commit/5c97d774003b04b8b4e3faef2b000db3c7eb8837))
+
 ## 1.0.0 (2026-10-08)
 
 
