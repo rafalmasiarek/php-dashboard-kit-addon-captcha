@@ -30,8 +30,9 @@ Or via `app.config['captcha']` if already bound in the container — `register()
 
 | Key | Scope | Meaning |
 |---|---|---|
-| `provider` | both | `recaptcha_v2` \| `recaptcha_v3` \| `turnstile` \| `hcaptcha` |
-| `site_key`, `secret_key` | both | Provider credentials |
+| `provider` | both | `recaptcha_v2` \| `recaptcha_v3` \| `turnstile` \| `hcaptcha`, or your own `CaptchaProviderInterface` instance — see below |
+| `widget` | both | Required only when `provider` is a `CaptchaProviderInterface` instance — the matching `CaptchaWidgetDescriptor` |
+| `site_key`, `secret_key` | both | Provider credentials — `secret_key` only required for a built-in shorthand `provider`; a custom provider already carries its own |
 | `login` | — | `false` (default) to disable, `true` to always show, or an array (below) |
 | `login.mode` | login | `'always'` (default) or `'x_failed'` |
 | `login.threshold` | login | Failed attempts before the widget appears, in `x_failed` mode (default 3) |
@@ -40,6 +41,23 @@ Or via `app.config['captcha']` if already bound in the container — `register()
 | `register` | — | `false` (default), `true`, or an array with `min_score`/`action` |
 
 An invisible widget (`recaptcha_v3`) has no checkbox to conditionally show, so `x_failed` mode has no effect on it — it always runs.
+
+### Using a provider this addon doesn't know about
+
+The four shorthand strings are convenience only — `CaptchaAddon` never needs editing to support a fifth provider, the same extensibility `rafalmasiarek/captcha` itself offers:
+
+```php
+use rafalmasiarek\DashboardKitCaptcha\CaptchaAddon;
+
+CaptchaAddon::register($app, $container, [
+    'provider' => new MyCustomProvider($secretKey), // implements CaptchaProviderInterface
+    'widget'   => MyCustomProvider::widget(),       // your own CaptchaWidgetDescriptor factory
+    'site_key' => $siteKey,
+    'login'    => ['mode' => 'x_failed', 'threshold' => 3],
+]);
+```
+
+`secret_key` isn't needed in this form — your provider already carries its own.
 
 ## Why the failed-attempt counter moved to the database
 

@@ -51,12 +51,15 @@ final class CaptchaAddon
      *
      * @param App $app Slim application instance.
      * @param ContainerInterface $container PHP-DI container.
-     * @param array<string, mixed> $config Addon configuration: 'provider'
-     *        ('recaptcha_v2'|'recaptcha_v3'|'turnstile'|'hcaptcha'), 'site_key',
-     *        'secret_key', 'login', 'register'. login/register may be
-     *        `true`/`false` or an array with 'mode'/'threshold'/'ttl_seconds'
-     *        (x-failed-attempts, login only), 'min_score' and 'action'
-     *        (reCAPTCHA v3 / hCaptcha Enterprise only, both optional).
+     * @param array<string, mixed> $config Addon configuration: 'provider' — either a
+     *        built-in shorthand string ('recaptcha_v2'|'recaptcha_v3'|'turnstile'|
+     *        'hcaptcha', using 'secret_key') or your own CaptchaProviderInterface
+     *        instance (in which case 'widget' must be a matching
+     *        CaptchaWidgetDescriptor) — plus 'site_key', 'login', 'register'.
+     *        login/register may be `true`/`false` or an array with
+     *        'mode'/'threshold'/'ttl_seconds' (x-failed-attempts, login only),
+     *        'min_score' and 'action' (reCAPTCHA v3 / hCaptcha Enterprise only,
+     *        both optional, built-in providers only).
      *
      * @return void
      */
@@ -72,19 +75,41 @@ final class CaptchaAddon
         $appConfig = $container->has('app.config') ? (array) $container->get('app.config') : [];
         $config    = \array_merge((array) ($appConfig['captcha'] ?? []), $config);
 
-        $providerKey = (string) ($config['provider']   ?? 'recaptcha_v2');
-        $siteKey     = (string) ($config['site_key']   ?? '');
-        $secretKey   = (string) ($config['secret_key'] ?? '');
+        $providerSetting = $config['provider'] ?? 'recaptcha_v2';
+        $siteKey         = (string) ($config['site_key'] ?? '');
 
-        if ($siteKey === '' || $secretKey === '') {
-            throw new \InvalidArgumentException('CaptchaAddon requires both site_key and secret_key to be set.');
+        if ($siteKey === '') {
+            throw new \InvalidArgumentException('CaptchaAddon requires site_key to be set.');
         }
 
         $http = $container->has(HttpClientInterface::class)
             ? $container->get(HttpClientInterface::class)
             : new CurlHttpClient(new SystemDnsResolver());
 
-        [$provider, $widget] = self::buildProvider($providerKey, $secretKey, $siteKey);
+        // 'provider' is either one of the built-in shorthand strings (below), or your
+        // own CaptchaProviderInterface for a provider this addon doesn't know about —
+        // the exact same extensibility rafalmasiarek/captcha itself offers; this addon
+        // never needs editing to support a new provider. $config['widget'] (a
+        // CaptchaWidgetDescriptor — see your provider's own widget()/widgetX() factory)
+        // is required alongside a custom provider, since there's no shorthand to infer
+        // it from.
+        if ($providerSetting instanceof CaptchaProviderInterface) {
+            $provider = $providerSetting;
+            $widget   = $config['widget'] ?? null;
+
+            if (!$widget instanceof CaptchaWidgetDescriptor) {
+                throw new \InvalidArgumentException(
+                    'CaptchaAddon: when "provider" is a CaptchaProviderInterface instance, "widget" must be a matching CaptchaWidgetDescriptor.'
+                );
+            }
+        } else {
+            $secretKey = (string) ($config['secret_key'] ?? '');
+            if ($secretKey === '') {
+                throw new \InvalidArgumentException('CaptchaAddon requires secret_key to be set for a built-in provider.');
+            }
+
+            [$provider, $widget] = self::buildProvider((string) $providerSetting, $secretKey, $siteKey);
+        }
 
         $ipAdapter = $container->has(RealIpResolver::class)
             ? new RealIpResolverAdapter($container->get(RealIpResolver::class))
