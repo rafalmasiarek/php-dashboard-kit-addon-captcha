@@ -53,9 +53,32 @@ If `rafalmasiarek\RealIpResolver::class` is bound in the container, it's bridged
 
 `FailedAttemptStoreInterface` (`increment()`/`count()`/`reset()`, TTL-aware) is the seam — `FailedAttemptTracker` (the default, via dashboard-kit's `Model`) works with whatever PDO driver the app already configured. A different storage backend (e.g. Redis, for a multi-server deployment without a shared database) can implement the same interface.
 
-## Custom widget rendering
+## Using CaptchaService in your own modules
 
-`CaptchaWidgetRendererInterface` covers the client-side half (`rafalmasiarek/captcha` deliberately doesn't — see its own README). `VisibleWidgetRenderer` covers reCAPTCHA v2, Turnstile, and hCaptcha — all three deliberately mirror the same `data-sitekey`/`data-callback`/`data-expired-callback` widget API for drop-in compatibility, so one implementation, parametrized by CSS class and script URL, covers all three. `InvisibleWidgetRenderer` covers reCAPTCHA v3's intercept-submit-and-execute flow.
+`CaptchaAddon::register()` builds one `CaptchaService` from the app's single `['captcha']` config and binds it in the container — not just for login/register. Any module that wants its own CAPTCHA (a contact form, a newsletter signup, whatever) injects the same service instead of re-deriving provider/widget/site-key wiring itself:
+
+```php
+use rafalmasiarek\DashboardKitCaptcha\CaptchaService;
+
+$captchaService = $container->get(CaptchaService::class);
+```
+
+Rendering (give each widget on the page its own `instanceId` — see `rafalmasiarek/captcha`'s own README for why):
+
+```php
+echo $captchaService->widget(instanceId: 'contactform');
+echo $captchaService->scripts(action: 'contact_submit', instanceId: 'contactform');
+```
+
+Verifying — `captchaFor()` returns a real `rafalmasiarek\Captcha\Captcha`, configured with the addon's provider/site/secret but your own `$container` label (for log output) and, optionally, your own `$expectedAction`/`$minScore`:
+
+```php
+$captcha = $captchaService->captchaFor('contactform', expectedAction: 'contact_submit');
+$token   = $request->getParsedBody()[$captchaService->tokenFieldName()] ?? '';
+$result  = $captcha->verify($token, $remoteIp);
+```
+
+`CaptchaService` holds no provider-specific knowledge of its own — it's a thin binding of `rafalmasiarek/captcha`'s own `Captcha`/`HtmlHelper`/`CaptchaWidgetDescriptor` to whatever this addon resolved from config, so a module using it gets the exact same behavior (fail-closed score/action checks, the `captcha:error` client-side event, CSP `$nonce` support, ...) `rafalmasiarek/captcha ^2.0` itself provides — see its own README for the full client-side contract.
 
 ## License
 

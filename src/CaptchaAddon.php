@@ -8,6 +8,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use rafalmasiarek\Captcha\Captcha;
 use rafalmasiarek\Captcha\CaptchaProviderInterface;
+use rafalmasiarek\Captcha\Provider\CaptchaWidgetDescriptor;
 use rafalmasiarek\Captcha\Provider\HCaptchaProvider;
 use rafalmasiarek\Captcha\Provider\RecaptchaProvider;
 use rafalmasiarek\Captcha\Provider\TurnstileProvider;
@@ -25,7 +26,9 @@ use Slim\App;
 
 /**
  * Wires CAPTCHA (reCAPTCHA v2/v3, Cloudflare Turnstile, or hCaptcha — via
- * rafalmasiarek/captcha) into dashboard-kit login and register forms.
+ * rafalmasiarek/captcha) into dashboard-kit login and register forms, and
+ * binds CaptchaService in the container so any OTHER module can render a
+ * widget and verify a token too, without re-deriving the same wiring.
  *
  * Supersedes rafalmasiarek/dashboard-kit-addon-recaptcha: same wiring
  * mechanism (FormSlotRegistry slots, auth.before_login/before_register hook
@@ -87,23 +90,26 @@ final class CaptchaAddon
             ? new RealIpResolverAdapter($container->get(RealIpResolver::class))
             : null;
 
+        $service = new CaptchaService($provider, $widget, $siteKey, $http, $ipAdapter);
+        $container->set(CaptchaService::class, static fn() => $service);
+
         $loginConfig    = $config['login']    ?? false;
         $registerConfig = $config['register'] ?? false;
 
         if ($loginConfig !== false) {
             $loginConfig = $loginConfig === true ? [] : (array) $loginConfig;
             self::syncSchema($container, $appConfig);
-            self::wireLogin($container, $provider, $widget, $http, $ipAdapter, $siteKey, $loginConfig);
+            self::wireLogin($container, $service, $widget, $ipAdapter, $loginConfig);
         }
 
         if ($registerConfig !== false) {
             $registerConfig = $registerConfig === true ? [] : (array) $registerConfig;
-            self::wireRegister($container, $provider, $widget, $http, $ipAdapter, $siteKey, $registerConfig);
+            self::wireRegister($container, $service, $registerConfig);
         }
     }
 
     /**
-     * Builds the verifier provider + widget renderer pair for a provider key.
+     * Builds the verifier provider + widget descriptor pair for a provider key.
      *
      * @param string $providerKey 'recaptcha_v2'|'recaptcha_v3'|'turnstile'|'hcaptcha'.
      * @param string $secretKey
@@ -111,27 +117,15 @@ final class CaptchaAddon
      *
      * @throws \InvalidArgumentException When $providerKey isn't recognized.
      *
-     * @return array{0: CaptchaProviderInterface, 1: CaptchaWidgetRendererInterface}
+     * @return array{0: CaptchaProviderInterface, 1: CaptchaWidgetDescriptor}
      */
     private static function buildProvider(string $providerKey, string $secretKey, string $siteKey): array
     {
         return match ($providerKey) {
-            'recaptcha_v2' => [
-                new RecaptchaProvider($secretKey),
-                new VisibleWidgetRenderer('g-recaptcha', 'https://www.google.com/recaptcha/api.js'),
-            ],
-            'recaptcha_v3' => [
-                new RecaptchaProvider($secretKey),
-                new InvisibleWidgetRenderer(),
-            ],
-            'turnstile' => [
-                new TurnstileProvider($secretKey),
-                new VisibleWidgetRenderer('cf-turnstile', 'https://challenges.cloudflare.com/turnstile/v0/api.js'),
-            ],
-            'hcaptcha' => [
-                new HCaptchaProvider($secretKey, $siteKey),
-                new VisibleWidgetRenderer('h-captcha', 'https://js.hcaptcha.com/1/api.js'),
-            ],
+            'recaptcha_v2' => [new RecaptchaProvider($secretKey), RecaptchaProvider::widgetV2()],
+            'recaptcha_v3' => [new RecaptchaProvider($secretKey), RecaptchaProvider::widgetV3()],
+            'turnstile' => [new TurnstileProvider($secretKey), TurnstileProvider::widget()],
+            'hcaptcha' => [new HCaptchaProvider($secretKey, $siteKey), HCaptchaProvider::widget()],
             default => throw new \InvalidArgumentException("CaptchaAddon: unknown provider \"{$providerKey}\"."),
         };
     }
@@ -202,57 +196,46 @@ final class CaptchaAddon
      * (reCAPTCHA v3) has no checkbox to conditionally show, so it always runs.
      *
      * @param ContainerInterface $container
-     * @param CaptchaProviderInterface $provider
-     * @param CaptchaWidgetRendererInterface $widget
-     * @param HttpClientInterface $http
+     * @param CaptchaService $service
+     * @param CaptchaWidgetDescriptor $widget
      * @param RealIpResolverAdapter|null $ipAdapter
-     * @param string $siteKey
      * @param array<string, mixed> $loginConfig 'mode', 'threshold', 'ttl_seconds', 'min_score', 'action'.
      *
      * @return void
      */
     private static function wireLogin(
         ContainerInterface $container,
-        CaptchaProviderInterface $provider,
-        CaptchaWidgetRendererInterface $widget,
-        HttpClientInterface $http,
+        CaptchaService $service,
+        CaptchaWidgetDescriptor $widget,
         ?RealIpResolverAdapter $ipAdapter,
-        string $siteKey,
         array $loginConfig,
     ): void {
         $mode       = (string) ($loginConfig['mode'] ?? 'always');
         $threshold  = (int) ($loginConfig['threshold']  ?? 3);
         $ttlSeconds = (int) ($loginConfig['ttl_seconds'] ?? self::DEFAULT_TTL_SECONDS);
-        $always     = $widget->isInvisible() || $mode !== 'x_failed';
+        $always     = $widget->widgetCssClass === null || $mode !== 'x_failed';
         $minScore   = isset($loginConfig['min_score']) ? (float) $loginConfig['min_score'] : null;
         $action     = (string) ($loginConfig['action'] ?? 'login');
 
         $tracker = new FailedAttemptTracker();
         $key     = self::attemptKey($ipAdapter);
 
-        $captcha = new Captcha(
-            $provider,
-            defaultIpProvider: $ipAdapter,
-            http: $http,
-            minScore: $minScore,
-            expectedAction: $minScore !== null ? $action : null,
-            container: 'login',
-        );
+        $captcha = $service->captchaFor('login', $minScore !== null ? $action : null, $minScore);
 
         $formSlots = $container->get(FormSlotRegistry::class);
 
-        $formSlots->register('login', 'form_fields', static function () use ($widget, $siteKey, $action, $always, $threshold, $tracker, $key): string {
+        $formSlots->register('login', 'form_fields', static function () use ($service, $action, $always, $threshold, $tracker, $key): string {
             if (!$always && $tracker->count($key) < $threshold) {
                 return '';
             }
-            return $widget->formFieldsMarkup($siteKey, $action);
+            return $service->widget(instanceId: 'login');
         });
 
-        $formSlots->register('login', 'scripts', static function () use ($widget, $siteKey, $action, $always, $threshold, $tracker, $key): string {
+        $formSlots->register('login', 'scripts', static function () use ($service, $action, $always, $threshold, $tracker, $key): string {
             if (!$always && $tracker->count($key) < $threshold) {
                 return '';
             }
-            return $widget->scriptsMarkup($siteKey, $action);
+            return $service->scripts($action, instanceId: 'login');
         });
 
         $hooks = $container->get(HookRegistry::class);
@@ -307,39 +290,21 @@ final class CaptchaAddon
      * x-failed-attempts mode for registration.
      *
      * @param ContainerInterface $container
-     * @param CaptchaProviderInterface $provider
-     * @param CaptchaWidgetRendererInterface $widget
-     * @param HttpClientInterface $http
-     * @param RealIpResolverAdapter|null $ipAdapter
-     * @param string $siteKey
+     * @param CaptchaService $service
      * @param array<string, mixed> $registerConfig 'min_score', 'action'.
      *
      * @return void
      */
-    private static function wireRegister(
-        ContainerInterface $container,
-        CaptchaProviderInterface $provider,
-        CaptchaWidgetRendererInterface $widget,
-        HttpClientInterface $http,
-        ?RealIpResolverAdapter $ipAdapter,
-        string $siteKey,
-        array $registerConfig,
-    ): void {
+    private static function wireRegister(ContainerInterface $container, CaptchaService $service, array $registerConfig): void
+    {
         $minScore = isset($registerConfig['min_score']) ? (float) $registerConfig['min_score'] : null;
         $action   = (string) ($registerConfig['action'] ?? 'register');
 
-        $captcha = new Captcha(
-            $provider,
-            defaultIpProvider: $ipAdapter,
-            http: $http,
-            minScore: $minScore,
-            expectedAction: $minScore !== null ? $action : null,
-            container: 'register',
-        );
+        $captcha = $service->captchaFor('register', $minScore !== null ? $action : null, $minScore);
 
         $formSlots = $container->get(FormSlotRegistry::class);
-        $formSlots->register('register', 'form_fields', $widget->formFieldsMarkup($siteKey, $action));
-        $formSlots->register('register', 'scripts', $widget->scriptsMarkup($siteKey, $action));
+        $formSlots->register('register', 'form_fields', $service->widget(instanceId: 'register'));
+        $formSlots->register('register', 'scripts', $service->scripts($action, instanceId: 'register'));
 
         $existing = $container->get('auth.before_register');
         $container->set('auth.before_register', static fn() => static function (ServerRequestInterface $request) use (

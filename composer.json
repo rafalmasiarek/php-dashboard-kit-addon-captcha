@@ -5,8 +5,8 @@
     "license": "BUSL-1.1",
     "require": {
         "php": ">=8.2",
-        "rafalmasiarek/dashboard-kit": "^5.4",
-        "rafalmasiarek/captcha": "^1.0",
+        "rafalmasiarek/dashboard-kit": "^5.4.2",
+        "rafalmasiarek/captcha": "^2.0",
         "rafalmasiarek/real-ip-resolver": "^2.3"
     },
     "autoload": {
