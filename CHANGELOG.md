@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/compare/v1.0.1...v1.0.2) (2026-11-01)
+
+
+### Miscellaneous Chores
+
+* **deps:** accept any dashboard-kit &gt;=5.4.2, not just the current major ([#6](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/issues/6)) ([291ac12](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/commit/291ac12dd6e480b6e7dc4514723ce00e3555bdb4))
+
 ## [1.0.1](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/compare/v1.0.0...v1.0.1) (2026-10-08)
 
 
