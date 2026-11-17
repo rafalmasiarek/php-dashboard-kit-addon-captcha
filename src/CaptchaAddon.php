@@ -30,15 +30,6 @@ use Slim\App;
  * binds CaptchaService in the container so any OTHER module can render a
  * widget and verify a token too, without re-deriving the same wiring.
  *
- * Supersedes rafalmasiarek/dashboard-kit-addon-recaptcha: same wiring
- * mechanism (FormSlotRegistry slots, auth.before_login/before_register hook
- * chaining, HookRegistry login/login_failed events), generalized to any
- * provider and backed by a DB-persisted, IP-keyed failed-attempt counter
- * instead of a PHP-session counter — a session-only counter is trivially
- * reset by an attacker who simply never retains a session cookie between
- * attempts, which defeats it as an anti-automation measure (it only ever
- * throttled a human repeatedly mistyping their password in one browser tab).
- *
  * @package rafalmasiarek\DashboardKitCaptcha
  */
 final class CaptchaAddon
