@@ -1,0 +1,16 @@
+name: php-dashboard-kit-addon-captcha
+repo_url: https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha
+license: BUSL-1.1
+
+context:
+  - |
+    CAPTCHA addon for [`rafalmasiarek/dashboard-kit`](https://github.com/rafalmasiarek/php-dashboard-kit) — injects reCAPTCHA (v2 or v3), Cloudflare Turnstile, or hCaptcha into the login and register forms, verified through [`rafalmasiarek/captcha`](https://github.com/rafalmasiarek/php-captcha).
+
+includes:
+  - docs/usage.md
+  - docs/api.md
+
+authors:
+  - name: Rafał Masiarek
+    github: rafalmasiarek
+    website: https://masiarek.pl
