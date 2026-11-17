@@ -8,7 +8,7 @@ context:
   - |
     CAPTCHA addon for [`rafalmasiarek/dashboard-kit`](https://github.com/rafalmasiarek/php-dashboard-kit) — injects reCAPTCHA (v2 or v3), Cloudflare Turnstile, or hCaptcha into the login and register forms, verified through [`rafalmasiarek/captcha`](https://github.com/rafalmasiarek/php-captcha).
 
-includes:
+footer_includes:
   - docs/usage.md
   - docs/api.md
 
