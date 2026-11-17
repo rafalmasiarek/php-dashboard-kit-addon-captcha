@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/compare/v1.0.2...v1.0.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* add BUSL-1.1 LICENSE file and complete license metadata ([#9](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/issues/9)) ([eb702fa](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/commit/eb702fa03ab93342f30ca1d91d8a1669df2bfad5))
+* rename includes to footer_includes in README.yml ([#11](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/issues/11)) ([92e11a5](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/commit/92e11a55e367c589b147930ba2aeadec7592eec5))
+
 ## [1.0.2](https://github.com/rafalmasiarek/php-dashboard-kit-addon-captcha/compare/v1.0.1...v1.0.2) (2026-11-01)
 
 
